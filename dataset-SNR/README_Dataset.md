@@ -1,8 +1,7 @@
 # Cello UCF - Gene Circuit Topology Dataset
 
-Este repositório contém o dataset `circuit_dataset.jsonl`, composto por **12.000 amostras** de topologias de circuitos genéticos simulados com alta precisão estocástica. O dataset foi gerado utilizando Algoritmos Genéticos Cartesianos (CGP) em Julia, buscando descobrir topologias viáveis de portas lógicas biológicas a partir da biblioteca real de proteínas do Cello UCF.
-
-Este dataset foi projetado especificamente como combustível para treinar modelos preditivos de **Graph Neural Networks (GNN)**, atuando como um "modelo substituto" (surrogate model) para simulações caras de equações diferenciais/estocásticas.
+Este dataset `circuit_dataset.jsonl`, é composto por **12.000 amostras** de topologias de circuitos genéticos simulados com alta precisão estocástica. O dataset foi gerado utilizando Algoritmos Genéticos Cartesianos (CGP) em Julia, buscando descobrir topologias viáveis de portas lógicas biológicas a partir da biblioteca real de proteínas do Cello UCF.
+Ele foi projetado especificamente como combustível para treinar modelos preditivos de **Graph Neural Networks (GNN)**, atuando como um "modelo substituto" (surrogate model) para simulações caras de equações diferenciais/estocásticas.
 
 ---
 
@@ -80,14 +79,5 @@ Cada linha do arquivo `circuit_dataset.jsonl` é um objeto JSON independente com
     *   **Identidade Biológica:** O valor inteiro $V$ na matriz não é apenas um booleano de conexão. Ele é o ID exato da proteína repressora (na biblioteca Cello UCF) que está atuando como o gate (nó receptor) daquela conexão.
     *   **Ordem dos Nós:** A primeira linha/coluna (`i=1`, `j=1`) é sempre o Input biológico (promotor indutível/LacI), e o último índice (`i=N`, `j=N`) é obrigatoriamente a saída do circuito (Output Repórter/YFP). 
 *   `components`: Dicionário mapeando cada nodo biológico às suas características físicas da Equação de Hill (Parâmetros empíricos da proteína: produção basal $y_{min}$, produção máxima $y_{max}$, constante de dissociação $K_d$, e cooperatividade $n$). O nó de input puro (LacI) possui esses parâmetros modelados como zerados para atuar apenas como trigger externo.
-*   `raw_samples_low` / `raw_samples_high`: Os 20 resultados exatos do SSA estocástico para que o modelo de IA possa, se desejado, aprender também a variância (noise) além da média, reconstruindo distribuições inteiras do sistema sem precisar simular equações caras.
+*   `raw_samples_low` / `raw_samples_high`: Os 20 resultados exatos do SSA estocástico para que o modelo de IA possa, se desejado, aprender também a variância (ruído) além da média, reconstruindo distribuições inteiras do sistema sem precisar simular equações caras.
 *   `snr`: O valor de aptidão (fitness escalar) otimizado pelo CGP. Usado primariamente para filtrar inviabilidade biológica e impor uma distância saudável entre os níveis lógicos (0 e 1).
-
----
-
-## 🚀 Utilização em Graph Neural Networks (GNN)
-
-Sugestão de uso para treinamento:
-1.  **Nodes:** Podem ser codificados a partir dos parâmetros contínuos da Equação de Hill de cada porta em `components` + `is_input` / `is_output`.
-2.  **Edges:** Construídas diretamente pela `matrix_W`. O valor inteiro de `matrix_W` pode ser utilizado com camadas de embedding, ou apenas como arestas booleanas para convoluções de grafo.
-3.  **Target (Loss):** O modelo pode ser treinado via regressão (MSE) utilizando o target escalar das médias (`steady_state_outputs`), predição contínua do próprio `snr`, ou até predição distribucional sobre os arrays `raw_samples`.

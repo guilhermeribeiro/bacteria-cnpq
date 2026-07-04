@@ -32,7 +32,7 @@ Ao invés de apenas plugar equações determinísticas de ODE, a métrica de sob
 
 ## 🧬 Biblioteca de Proteínas (Cello UCF Mappings)
 
-Esta tabela mapeia os índices numéricos utilizados na matriz de adjacência `matrix_W` para as respectivas portas lógicas e parâmetros físicos da biblioteca Cello UCF:
+Esta tabela mapeia os índices numéricos utilizados na matriz de adjacência `matrix_W` para as respectivas portas lógicas e parâmetros físicos da biblioteca Cello UCF. **Nota:** Esta lista contém **todas as 20 proteínas repressoras** validadas da biblioteca UCF que foram disponibilizadas para o Algoritmo Genético, e que consequentemente podem ser encontradas nas amostras do dataset:
 
 | Julia Dataset Index | Protein Name | UCF Gate Name | ymin | ymax | Kd | n |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -103,6 +103,7 @@ Cada linha do arquivo `circuit_dataset.jsonl` é um objeto JSON independente com
     *   **Direção do Fluxo:** Se existe um valor $V > 0$ na posição `W[i, j]`, significa que há uma conexão regulatória (aresta direcionada) **do nó `j` para o nó `i`** (Sinal flui de $j \rightarrow i$).
     *   **Identidade Biológica:** O valor inteiro $V$ na matriz não é apenas um booleano de conexão. Ele é o ID exato da proteína repressora (na biblioteca Cello UCF) que está atuando como o gate (nó receptor) daquela conexão.
     *   **Ordem dos Nós:** A primeira linha/coluna (`i=1`, `j=1`) é sempre o Input biológico (promotor indutível/LacI), e o último índice (`i=N`, `j=N`) é obrigatoriamente a saída do circuito (Output Repórter/YFP). 
-*   `components`: Dicionário mapeando cada nodo biológico às suas características físicas da Equação de Hill (Parâmetros empíricos da proteína: produção basal $y_{min}$, produção máxima $y_{max}$, constante de dissociação $K_d$, e cooperatividade $n$). O nó de input puro (LacI) possui esses parâmetros modelados como zerados para atuar apenas como trigger externo.
+*   `components`: Dicionário mapeando cada nodo biológico às suas características físicas da Equação de Hill (Parâmetros empíricos da proteína: produção basal $y_{min}$, produção máxima $y_{max}$, constante de dissociação $K_d$, e cooperatividade $n$). O nó de input puro (LacI) possui esses parâmetros modelados como zerados para atuar apenas como trigger externo. **Atenção:** As constantes físicas contidas aqui estão intrinsecamente ligadas à chave `metadata_for_humans`.
+*   `metadata_for_humans`: Como o nome sugere, serve puramente para traduzir o que o bloco `components` representa na biologia real. Enquanto o `components` fornece a matemática crua (as constantes de Hill) para o nó, o `metadata_for_humans` diz, por exemplo, que aquele nó específico (com aquelas constantes) é a proteína `PhlF` ou `BM3R1`.
 *   `raw_samples_low` / `raw_samples_high`: Os 20 resultados exatos do SSA estocástico para que o modelo de IA possa, se desejado, aprender também a variância (ruído) além da média, reconstruindo distribuições inteiras do sistema sem precisar simular equações caras.
 *   `snr`: O valor de aptidão (fitness escalar) otimizado pelo CGP. Usado primariamente para filtrar inviabilidade biológica e impor uma distância saudável entre os níveis lógicos (0 e 1).

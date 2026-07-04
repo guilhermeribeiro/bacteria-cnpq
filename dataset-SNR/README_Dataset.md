@@ -30,48 +30,73 @@ Ao invés de apenas plugar equações determinísticas de ODE, a métrica de sob
 
 ---
 
+## 🧬 Biblioteca de Proteínas (Cello UCF Mappings)
+
+Esta tabela mapeia os índices numéricos utilizados na matriz de adjacência `matrix_W` para as respectivas portas lógicas e parâmetros físicos da biblioteca Cello UCF:
+
+| Julia Dataset Index | Protein Name | UCF Gate Name | ymin | ymax | Kd | n |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 1 | AmtR | A1_AmtR | 0.06 | 3.80 | 0.07 | 1.60 |
+| 2 | BM3R1 | B1_BM3R1 | 0.004 | 0.50 | 0.04 | 3.40 |
+| 3 | BM3R1 | B2_BM3R1 | 0.005 | 0.50 | 0.15 | 2.90 |
+| 4 | BM3R1 | B3_BM3R1 | 0.01 | 0.80 | 0.26 | 3.40 |
+| 5 | BetI | E1_BetI | 0.07 | 3.80 | 0.41 | 2.40 |
+| 6 | AmeR | F1_AmeR | 0.20 | 3.80 | 0.09 | 1.40 |
+| 7 | HlyIIR | H1_HlyIIR | 0.07 | 2.50 | 0.19 | 2.60 |
+| 8 | IcaRA | I1_IcaRA | 0.08 | 2.20 | 0.10 | 1.40 |
+| 9 | LitR | L1_LitR | 0.07 | 4.30 | 0.05 | 1.70 |
+| 10 | LmrA | N1_LmrA | 0.20 | 2.20 | 0.18 | 2.10 |
+| 11 | PhlF | P1_PhlF | 0.01 | 3.90 | 0.03 | 4.00 |
+| 12 | PhlF | P2_PhlF | 0.02 | 4.10 | 0.13 | 3.90 |
+| 13 | PhlF | P3_PhlF | 0.02 | 6.80 | 0.23 | 4.20 |
+| 14 | QacR | Q1_QacR | 0.01 | 2.40 | 0.05 | 2.70 |
+| 15 | QacR | Q2_QacR | 0.03 | 2.80 | 0.21 | 2.40 |
+| 16 | PsrA | R1_PsrA | 0.20 | 5.90 | 0.19 | 1.80 |
+| 17 | SrpR | S1_SrpR | 0.003 | 1.30 | 0.01 | 2.90 |
+| 18 | SrpR | S2_SrpR | 0.003 | 2.10 | 0.04 | 2.60 |
+| 19 | SrpR | S3_SrpR | 0.004 | 2.10 | 0.06 | 2.80 |
+| 20 | SrpR | S4_SrpR | 0.007 | 2.10 | 0.10 | 2.80 |
+
+---
+
 ## 📂 Estrutura do JSONL (Esquema de Dados)
 
 Cada linha do arquivo `circuit_dataset.jsonl` é um objeto JSON independente com a seguinte estrutura:
 
 ```json
 {
-  "id": "1719717551465225272_1", 
-  "gate": "NOT", 
+  "id": "38279134794832922_3",
+  "gate": "NOT",
   "algorithm_mnemonic": "CGP Julia (Ensemble=20)",
   "ensemble_size": 20,
-  "snr": 2.81603,
-  
+  "snr": 2.6694265772021075,
   "steady_state_outputs": {
-    "input_low_mean": 304.0,
-    "input_high_mean": 353.1
+    "input_low_mean": 74.55,
+    "input_high_mean": 97.6
   },
-  
-  "raw_samples_low": [360.0, 321.0, 130.0, ...], // Array com as 20 respostas estocásticas brutas (Low)
-  "raw_samples_high": [345.0, 458.0, 137.0, ...], // Array com as 20 respostas estocásticas brutas (High)
-  
+  "raw_samples_low": [23.0, 37.0, 88.0, 33.0, 93.0, 97.0, 73.0, 86.0, 25.0, 45.0, 143.0, 59.0, 66.0, 86.0, 103.0, 77.0, 42.0, 132.0, 74.0, 109.0],
+  "raw_samples_high": [83.0, 97.0, 55.0, 131.0, 95.0, 149.0, 84.0, 117.0, 72.0, 75.0, 38.0, 143.0, 118.0, 80.0, 45.0, 185.0, 117.0, 66.0, 134.0, 68.0],
   "matrix_W": [
-    [0, 15, 0, 0],
-    [0, 0, 7, 0],
-    [0, 0, 0, 9],
+    [0, 0, 4, 0],
+    [0, 0, 0, 2],
+    [0, 11, 0, 0],
     [0, 0, 0, 0]
   ],
-  
   "components": {
-    "node_1": {"is_input": 1.0, "is_output": 0.0, "ymin": 0.0, "ymax": 0.0, "Kd": 0.0, "n_real": 0.0},
-    "node_2": {"is_input": 0.0, "is_output": 0.0, "ymin": 0.015, "ymax": 0.89, "Kd": 0.07, "n_real": 2.3},
-    "node_3": {"is_input": 0.0, "is_output": 0.0, "ymin": 0.04, "ymax": 1.2, "Kd": 0.15, "n_real": 1.7},
-    "node_4": {"is_input": 0.0, "is_output": 1.0, "ymin": 0.02, "ymax": 1.0, "Kd": 0.1, "n_real": 1.0}
+    "node_1": {"is_output": 0.0, "is_input": 1.0, "ymin": 0.0, "ymax": 0.0, "n_real": 0.0, "Kd": 0.0},
+    "node_2": {"is_output": 0.0, "is_input": 0.0, "ymin": 0.004, "ymax": 0.5, "n_real": 3.4, "Kd": 0.04},
+    "node_3": {"is_output": 0.0, "is_input": 0.0, "ymin": 0.01, "ymax": 3.9, "n_real": 4.0, "Kd": 0.03},
+    "node_4": {"is_output": 1.0, "is_input": 0.0, "ymin": 0.02, "ymax": 1.0, "n_real": 1.0, "Kd": 0.1}
   },
-  
   "metadata_for_humans": {
     "node_1": "LacI",
-    "node_2": "AmtR",
+    "node_2": "BM3R1",
     "node_3": "PhlF",
     "node_4": "YFP"
   }
 }
 ```
+
 
 ### Dicionário de Chaves:
 *   `matrix_W`: Matriz de adjacência (Topologia do Grafo). Ela dita tanto a conexão entre os nós quanto a biologia estrutural do circuito:

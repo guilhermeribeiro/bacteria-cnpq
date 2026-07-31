@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore")
 dataset = pd.read_csv("/Users/guilhermeribeiro/MEGA/PyCharmProjects/bacteria-cnpq/dataset-SNR/artifacts/graph_statistics.csv", encoding='utf-8')
 dataset = dataset.replace(np.nan, 0)
 
+# Remoção de outliers (SNRs >= 5)
 dataset = dataset[dataset['Y']<5] # Remoção de outliers (SNRs >= 5)
 
 labels = dataset[['Y']]

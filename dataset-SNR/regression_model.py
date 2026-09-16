@@ -13,14 +13,18 @@ import statistics as st
 warnings.filterwarnings("ignore")
 
 
+# Porta NOT
 dataset = pd.read_csv("/Users/guilhermeribeiro/MEGA/PyCharmProjects/bacteria-cnpq/dataset-SNR/artifacts/graph_statistics.csv", encoding='utf-8')
+# Porta XOR
+# dataset = pd.read_csv("/Users/guilhermeribeiro/MEGA/PyCharmProjects/bacteria-cnpq/dataset-SNR/xor-dataset/artifacts/graph_statistics.csv", encoding='utf-8')
 dataset = dataset.replace(np.nan, 0)
 
 # Remoção de outliers (SNRs >= 5)
 dataset = dataset[dataset['Y']<5] # Remoção de outliers (SNRs >= 5)
 
 labels = dataset[['Y']]
-dataset = dataset.drop(['snr','Y', 'gate'], axis=1)
+dataset = dataset.drop(['snr','Y', 'gate'], axis=1) # Porta NOT
+# dataset = dataset.drop(['snr','Y', 'gate', 'algorithm_mnemonic', 'circuit_id'], axis=1) # Porta XOR
 
 
 def rfe_svm_f1(dataset, labels):

@@ -1,0 +1,15 @@
+name = "GeneticLogicGraph"
+uuid = "67d60cd0-a965-4ea1-bc1b-dfa0778c5ea0"
+authors = ["Lewis Grozinger <l.grozinger2@ncl.ac.uk>"]
+version = "0.1.0"
+
+[deps]
+Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+JumpProcesses = "ccbc3e58-028d-4f4c-8cd5-9ae44345cda5"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

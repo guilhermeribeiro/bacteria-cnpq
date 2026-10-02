@@ -1,0 +1,22 @@
+{
+  "environment": {
+    "python2_exe": "auto",
+    "julia_exe": "auto"
+  },
+  "dataset": {
+    "gate_name": "XOR",
+    "snr_threshold": 0.85,
+    "ensemble_size": 32,
+    "output_file": "circuit_dataset_XOR.jsonl"
+  },
+  "generation": {
+    "target_samples": 2000,
+    "max_concurrent_julia": 4
+  },
+  "optuna": {
+    "study_name": "darts_circuit_search",
+    "n_trials": 10000,
+    "sampler": "tpe",
+    "n_jobs": 8
+  }
+}

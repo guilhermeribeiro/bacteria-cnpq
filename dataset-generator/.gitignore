@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+optuna_runs/
+scratch/
+*.db
+*.log
+*.tmp

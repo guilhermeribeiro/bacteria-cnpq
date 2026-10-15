@@ -123,10 +123,30 @@ function get_circuit_outputs(G::DiGraph, proteins)
     s_11 = zeros(Float64, ENSEMBLE_SIZE)
     
     Threads.@threads for k in 1:ENSEMBLE_SIZE
-        s_00[k] = Float64(solve(prob_00, SSAStepper())[end][idx])
-        s_01[k] = Float64(solve(prob_01, SSAStepper())[end][idx])
-        s_10[k] = Float64(solve(prob_10, SSAStepper())[end][idx])
-        s_11[k] = Float64(solve(prob_11, SSAStepper())[end][idx])
+        try
+            sol00 = solve(prob_00, SSAStepper(); maxiters=250_000)
+            s_00[k] = length(sol00) > 0 ? Float64(sol00[end][idx]) : 0.0
+        catch e00
+            s_00[k] = 0.0
+        end
+        try
+            sol01 = solve(prob_01, SSAStepper(); maxiters=250_000)
+            s_01[k] = length(sol01) > 0 ? Float64(sol01[end][idx]) : 0.0
+        catch e01
+            s_01[k] = 0.0
+        end
+        try
+            sol10 = solve(prob_10, SSAStepper(); maxiters=250_000)
+            s_10[k] = length(sol10) > 0 ? Float64(sol10[end][idx]) : 0.0
+        catch e10
+            s_10[k] = 0.0
+        end
+        try
+            sol11 = solve(prob_11, SSAStepper(); maxiters=250_000)
+            s_11[k] = length(sol11) > 0 ? Float64(sol11[end][idx]) : 0.0
+        catch e11
+            s_11[k] = 0.0
+        end
     end
     
     return s_00, s_01, s_10, s_11
@@ -226,12 +246,15 @@ end
 println(stdout, "JULIA_DAEMON_READY")
 flush(stdout)
 
+eval_counter = 0
+
 while true
     line = readline(stdin)
     if isempty(line) || strip(line) == "EXIT"
         break
     end
     
+    global eval_counter += 1
     run_dir = String(strip(line))
     try
         snr, err_msg = Base.invokelatest(evaluate_test_run, run_dir)
@@ -244,4 +267,9 @@ while true
         println(stdout, "ERROR:" * string(e))
     end
     flush(stdout)
+    
+    # Coleta de lixo rápida periódica para manter a memória RAM compacta
+    if eval_counter % 25 == 0
+        GC.gc(false)
+    end
 end

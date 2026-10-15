@@ -141,17 +141,33 @@ function get_circuit_outputs(G::DiGraph, proteins)
     s_11 = Vector{Float64}(undef, ENSEMBLE_SIZE)
     
     Threads.@threads for k in 1:ENSEMBLE_SIZE
-        sol = solve(prob_00, SSAStepper())
-        s_00[k] = Float64(sol[end][idx])
+        try
+            sol = solve(prob_00, SSAStepper(); maxiters=250_000)
+            s_00[k] = length(sol) > 0 ? Float64(sol[end][idx]) : 0.0
+        catch
+            s_00[k] = 0.0
+        end
         
-        sol = solve(prob_01, SSAStepper())
-        s_01[k] = Float64(sol[end][idx])
+        try
+            sol = solve(prob_01, SSAStepper(); maxiters=250_000)
+            s_01[k] = length(sol) > 0 ? Float64(sol[end][idx]) : 0.0
+        catch
+            s_01[k] = 0.0
+        end
         
-        sol = solve(prob_10, SSAStepper())
-        s_10[k] = Float64(sol[end][idx])
+        try
+            sol = solve(prob_10, SSAStepper(); maxiters=250_000)
+            s_10[k] = length(sol) > 0 ? Float64(sol[end][idx]) : 0.0
+        catch
+            s_10[k] = 0.0
+        end
         
-        sol = solve(prob_11, SSAStepper())
-        s_11[k] = Float64(sol[end][idx])
+        try
+            sol = solve(prob_11, SSAStepper(); maxiters=250_000)
+            s_11[k] = length(sol) > 0 ? Float64(sol[end][idx]) : 0.0
+        catch
+            s_11[k] = 0.0
+        end
     end
     
     return s_00, s_01, s_10, s_11

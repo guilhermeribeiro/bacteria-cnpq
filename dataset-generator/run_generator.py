@@ -115,8 +115,45 @@ OPTUNA_CFG = config.get("optuna", {})
 GATE_NAME      = DS_CFG.get("gate_name", "XOR")
 SNR_THRESHOLD  = float(DS_CFG.get("snr_threshold", 0.85))
 ENSEMBLE_SIZE  = int(DS_CFG.get("ensemble_size", 32))
-TARGET_SAMPLES = int(GEN_CFG.get("target_samples", 1766))
-OUTPUT_FILE    = os.path.join(CURRENT_DIR, DS_CFG.get("output_file", "circuit_dataset_XOR_DARTS_FAST.jsonl"))
+TARGET_SAMPLES = int(GEN_CFG.get("target_samples", 10000))
+OUTPUT_FILE    = os.path.join(CURRENT_DIR, DS_CFG.get("output_file", "circuit_dataset_XOR.jsonl"))
+STRATIFIED_SPECTRUM = bool(GEN_CFG.get("stratified_spectrum", True))
+
+DEFAULT_SPECTRUM_BINS = {
+    "neg_and_low": {
+        "name": "Falhas/Negativos/Muito Baixo (SNR < 0.50)",
+        "min": -999.0,
+        "max": 0.50,
+        "target": 1500
+    },
+    "suboptimal": {
+        "name": "Sub-ótimos/Transição (0.50 <= SNR < 0.85)",
+        "min": 0.50,
+        "max": 0.85,
+        "target": 1500
+    },
+    "standard": {
+        "name": "Funcionais Padrão (0.85 <= SNR < 2.00)",
+        "min": 0.85,
+        "max": 2.00,
+        "target": 4500
+    },
+    "high_fidelity": {
+        "name": "Alta Fidelidade / Campeões (SNR >= 2.00)",
+        "min": 2.00,
+        "max": 999.0,
+        "target": 2500
+    }
+}
+SPECTRUM_BINS = GEN_CFG.get("spectrum_bins", DEFAULT_SPECTRUM_BINS)
+
+def get_spectrum_bin(snr):
+    for b_key, b_info in SPECTRUM_BINS.items():
+        if float(b_info.get("min", -999.0)) <= snr < float(b_info.get("max", 999.0)):
+            return b_key
+    if snr >= 2.0:
+        return "high_fidelity"
+    return "neg_and_low"
 
 def is_python2(bin_path):
     if not bin_path:
@@ -240,6 +277,8 @@ anti_dup_enforcer = CircuitAntiDuplicationEnforcer(min_diversity_threshold=0.04)
 # Carrega circuitos existentes no dataset para o Arquivo de Novidade e Indice Anti-Duplicacao
 initial_count = 0
 CHAMPION_SEEDS = []
+bin_counts = {k: 0 for k in SPECTRUM_BINS}
+
 if os.path.exists(OUTPUT_FILE):
     with open(OUTPUT_FILE, "r") as f:
         for line in f:
@@ -259,18 +298,29 @@ if os.path.exists(OUTPUT_FILE):
                     archive.add_circuit(len(c_slots), c_w, c_slots, c_snr, metadata={"id": c_obj.get("id")})
                     anti_dup_enforcer.register(len(c_slots), c_w, c_slots, circuit_id=str(c_obj.get("id", "")))
                     initial_count += 1
+                    b_k = get_spectrum_bin(c_snr)
+                    if b_k in bin_counts:
+                        bin_counts[b_k] += 1
             except Exception:
                 pass
 
 print("=" * 75)
-print("  GENENET-DARTS MULTI-OBJETIVO (NSGA-II) [DIVERSIDADE + SNR]")
+print("  GENENET-DARTS MULTI-OBJETIVO (NSGA-II) [DIVERSIDADE + MULTI-ESPECTRO]")
 print("=" * 75)
 print("  Python Principal (Optuna): {} (v{})".format(sys.executable, sys.version.split()[0]))
 print("  Python 2 (Theano DARTS):   {}".format(PY2_EXE))
 print("  Julia (Gillespie SSA):     {}".format(JULIA_EXE))
-print("  Meta de Circuitos Salvos:  {} (Porta: {}, SNR >= {:.2f})".format(TARGET_SAMPLES, GATE_NAME, SNR_THRESHOLD))
+print("  Meta de Circuitos Salvos:  {} (Porta: {})".format(TARGET_SAMPLES, GATE_NAME))
+print("  Modo de Coleta:            {}".format("Amostragem Estratificada Multi-Faixas" if STRATIFIED_SPECTRUM else "Limiar Simples (SNR >= {:.2f})".format(SNR_THRESHOLD)))
 print("  Arquivo Alvo:              {}".format(OUTPUT_FILE))
 print("  Circuitos ja no Arquivo:   {} circuitos carregados".format(initial_count))
+if STRATIFIED_SPECTRUM:
+    print("  Distribuição Atual por Faixa de SNR:")
+    for b_k, b_info in SPECTRUM_BINS.items():
+        c_cur = bin_counts.get(b_k, 0)
+        c_tgt = b_info.get("target", 0)
+        pct = (float(c_cur) / max(1.0, float(c_tgt))) * 100.0
+        print("    - {:<38}: {:>5} / {:>5} ({:>5.1f}%)".format(b_info.get("name", b_k), c_cur, c_tgt, pct))
 print("  Sementes Campeãs Carregadas: {} sementes únicas para Semeação Híbrida".format(len(CHAMPION_SEEDS)))
 print("  Limite Concorrente Julia:  {} simulações simultâneas (RAM Controlada)".format(MAX_CONCURRENT_JULIA))
 print("=" * 75)
@@ -418,15 +468,16 @@ def get_julia_daemon():
                 julia_daemon = False
         return julia_daemon
 
-def evaluate_with_julia(run_dir, timeout=300):
+def evaluate_with_julia(run_dir, timeout=45):
     daemon = get_julia_daemon()
     if daemon:
         try:
-            snr_val, snr_data, j_elapsed, err_msg = daemon.evaluate(run_dir, timeout=90)
+            snr_val, snr_data, j_elapsed, err_msg = daemon.evaluate(run_dir, timeout=timeout)
             if not err_msg and snr_data is not None:
                 return snr_val, snr_data, j_elapsed, ""
-        except Exception:
-            pass
+            return snr_val, snr_data, j_elapsed, err_msg
+        except Exception as e:
+            return 0.0, None, 0.0, "Falha na comunicação com daemon: " + str(e)
 
     cmd = [JULIA_EXE, "-t", "4", "--startup-file=no", "-O1", JULIA_EVAL_SCRIPT, run_dir]
     env = os.environ.copy()
@@ -596,6 +647,12 @@ def objective(trial):
                 shutil.rmtree(os.path.join(root, "lock_dir"), ignore_errors=True)
     env_th["THEANO_FLAGS"] = "base_compiledir={}".format(slot_dir.replace("\\", "/"))
     
+    with print_lock:
+        print("[{}] [Trial {:04d}] Iniciando síntese Theano DARTS ({} épocas, seed={})...".format(
+            ts(), trial_id, iters, seed
+        ))
+        sys.stdout.flush()
+
     t0_th = time.time()
     try:
         ret_th, out_th, timed_out_th = run_cmd_timeout(cmd_theano, env=env_th, timeout=950)
@@ -676,9 +733,19 @@ def objective(trial):
     trial.set_user_attr("theano_snr", th_snr)
     trial.set_user_attr("theano_signal", th_signal)
     
-    # Calibração Biofísica rigorosa: baseada nos 11 campeões (min_signal=0.046, max_mse=0.111)
-    # Margem de tolerância segura: sinal >= 0.035 e MSE <= 0.115
-    is_promising = (th_signal >= 0.035) and (th_final_mse <= 0.115)
+    # Se estamos no modo estratificado e ainda precisamos de circuitos negativos ou sub-ótimos:
+    need_negatives = STRATIFIED_SPECTRUM and (
+        bin_counts.get("neg_and_low", 0) < SPECTRUM_BINS.get("neg_and_low", {}).get("target", 0) or
+        bin_counts.get("suboptimal", 0) < SPECTRUM_BINS.get("suboptimal", {}).get("target", 0)
+    )
+
+    if need_negatives:
+        # Relaxa o filtro de Theano para permitir que circuitos com sinal fraco ou MSE moderado cheguem à Julia SSA
+        is_promising = (th_signal >= -0.05) and (th_final_mse <= 0.35)
+    else:
+        # Calibração Biofísica rigorosa para funcionais e campeões
+        is_promising = (th_signal >= 0.035) and (th_final_mse <= 0.115)
+
     if not is_promising:
         trial.set_user_attr("is_converged", False)
         shutil.rmtree(run_dir, ignore_errors=True)
@@ -705,15 +772,50 @@ def objective(trial):
             sys.stdout.flush()
         return -2.0, 0.0
 
-    # Avaliação em Julia SSA (com semáforo de proteção de RAM)
-    snr_val, snr_data, j_elapsed, j_err = evaluate_with_julia(run_dir, timeout=300)
+    # Avaliação em Julia SSA (com semáforo de proteção de RAM e watchdog de timeout)
+    with print_lock:
+        print("[{}] [Trial {:04d}] Iniciando simulação Julia SSA (Gillespie Estocástico, N={})...".format(
+            ts(), trial_id, ENSEMBLE_SIZE
+        ))
+        sys.stdout.flush()
+
+    snr_val, snr_data, j_elapsed, j_err = evaluate_with_julia(run_dir, timeout=60)
+    
+    with print_lock:
+        if j_err:
+            print("[{}] [Trial {:04d}] Julia SSA finalizada em {:.1f}s com status: {}".format(
+                ts(), trial_id, j_elapsed, j_err
+            ))
+        else:
+            print("[{}] [Trial {:04d}] Julia SSA concluída em {:.1f}s -> SNR={:.4f}".format(
+                ts(), trial_id, j_elapsed, snr_val
+            ))
+        sys.stdout.flush()
     
     # Objetivo 2: Novidade Topológica e Proteica contra o Arquivo de Campeões
     novelty_score = archive.compute_novelty(S, matrix_W, slot_winners)
     
+    # Verificação de Faixa no Espectro de SNR
+    b_key = get_spectrum_bin(snr_val)
+    b_target = SPECTRUM_BINS.get(b_key, {}).get("target", 999999)
+    b_cur = bin_counts.get(b_key, 0)
+
+    should_accept = False
+    if STRATIFIED_SPECTRUM:
+        if b_cur < b_target or (snr_val >= 2.0 and state["valid_count"] < TARGET_SAMPLES):
+            should_accept = True
+            status_tag = "ACEITO ({})".format(b_key)
+        else:
+            status_tag = "COTA CHEIA ({})".format(b_key)
+    else:
+        if snr_val >= SNR_THRESHOLD:
+            should_accept = True
+            status_tag = "ALVO BATEU (>= {:.2f})".format(SNR_THRESHOLD)
+        else:
+            status_tag = "ABAIXO (SNR={:.2f})".format(snr_val)
+
     # Formatação de saída para monitoramento
     slots_summary = ", ".join(["{}({:.0f}%)".format(s.get("winner"), s.get("confidence_pct", 100)) for s in slots[2:-1]])
-    status_tag = "ALVO BATEU (>=0.85)!" if snr_val >= SNR_THRESHOLD else ("QUASE (>=0.50)" if snr_val >= 0.50 else "NORMAL")
     
     with print_lock:
         print("[{}] [Trial {:04d} | {}] S={} | lr={:.3f} | ew={:.3f} | snr_w={:.3f} | iters={} (Th={:.1f}s) | ThMSE={:.4f} | SNR={:.4f} (Jl={:.1f}s) | Nov={:.4f} | Slots: {}".format(
@@ -725,43 +827,49 @@ def objective(trial):
     trial.set_user_attr("snr_julia", snr_val)
     trial.set_user_attr("novelty", novelty_score)
     trial.set_user_attr("S", S)
+    trial.set_user_attr("spectrum_bin", b_key)
     
-    # Se atingiu o threshold biológico de aceitação:
-    if snr_val >= SNR_THRESHOLD and snr_data is not None:
+    # Se o circuito qualifica para ser salvo no dataset:
+    if should_accept and snr_data is not None:
         with dataset_lock:
             if state["valid_count"] < TARGET_SAMPLES:
                 # Verificação atômica final sob lock
                 is_dup_lock, _, matched_id_lock = anti_dup_enforcer.is_duplicate(S, matrix_W, slots)
                 if not is_dup_lock:
-                    state["valid_count"] += 1
-                    curr_valid = state["valid_count"]
+                    b_cur_lock = bin_counts.get(b_key, 0)
+                    if not STRATIFIED_SPECTRUM or b_cur_lock < b_target or (snr_val >= 2.0 and state["valid_count"] < TARGET_SAMPLES):
+                        bin_counts[b_key] = b_cur_lock + 1
+                        state["valid_count"] += 1
+                        curr_valid = state["valid_count"]
+                        
+                        # Salva no dataset JSONL oficial com schema de 17 chaves
+                        standardize_and_save_circuit(run_dir, run_name, snr_data, slots, matrix_W, seed=seed)
+                        
+                        # Alimenta o arquivo de diversidade online para forçar o NSGA-II a explorar outras regiões
+                        archive.add_circuit(S, matrix_W, slot_winners, snr_val, metadata={"trial": trial_id, "bin": b_key})
+                        anti_dup_enforcer.register(S, matrix_W, slots, circuit_id=run_name)
+                        if seed is not None and seed not in CHAMPION_SEEDS:
+                            CHAMPION_SEEDS.append(seed)
                     
-                    # Salva no dataset JSONL oficial com schema de 17 chaves
-                    standardize_and_save_circuit(run_dir, run_name, snr_data, slots, matrix_W, seed=seed)
-                    
-                    # Alimenta o arquivo de diversidade online para forçar o NSGA-II a explorar outras regiões
-                    archive.add_circuit(S, matrix_W, slot_winners, snr_val, metadata={"trial": trial_id})
-                    anti_dup_enforcer.register(S, matrix_W, slots, circuit_id=run_name)
-                    if seed is not None and seed not in CHAMPION_SEEDS:
-                        CHAMPION_SEEDS.append(seed)
-                
-                    elapsed = time.time() - state["start_time"]
-                    session_valid = curr_valid - state.get("session_initial_count", 0)
-                    rate = (float(session_valid) / max(elapsed, 1.0)) * 3600.0
-                    
-                    print("\n" + "#" * 80)
-                    print("*** [CAMPEAO ENCONTRADO E SALVO!] ***")
-                    print("   Trial:      {:04d}".format(trial_id))
-                    print("   Julia SNR:  {:.4f} (Threshold >= {:.2f})".format(snr_val, SNR_THRESHOLD))
-                    print("   Novidade:   {:.4f} (Distância ao Arquivo)".format(novelty_score))
-                    print("   Slots:      {}".format(slot_winners))
-                    print("   Progresso:  {}/{} circuitos ({:.2f}%)".format(curr_valid, TARGET_SAMPLES, (curr_valid / TARGET_SAMPLES) * 100.0))
-                    print("   Velocidade: {:.1f} circuitos aceitos/hora".format(rate))
-                    print("#" * 80 + "\n")
-                    sys.stdout.flush()
-                    
-                    if state["valid_count"] >= TARGET_SAMPLES:
-                        trial.study.stop()
+                        elapsed = time.time() - state["start_time"]
+                        session_valid = curr_valid - state.get("session_initial_count", 0)
+                        rate = (float(session_valid) / max(elapsed, 1.0)) * 3600.0
+                        
+                        b_name_curr = SPECTRUM_BINS.get(b_key, {}).get("name", b_key)
+                        print("\n" + "#" * 80)
+                        print("*** [CIRCUITO QUALIFICADO E SALVO NO DATASET!] ***")
+                        print("   Trial:      {:04d}".format(trial_id))
+                        print("   Faixa:      {} (Cota: {}/{})".format(b_name_curr, bin_counts[b_key], b_target))
+                        print("   Julia SNR:  {:.4f}".format(snr_val))
+                        print("   Novidade:   {:.4f} (Distância ao Arquivo)".format(novelty_score))
+                        print("   Slots:      {}".format(slot_winners))
+                        print("   Progresso:  {}/{} circuitos ({:.2f}%)".format(curr_valid, TARGET_SAMPLES, (curr_valid / TARGET_SAMPLES) * 100.0))
+                        print("   Velocidade: {:.1f} circuitos aceitos/hora".format(rate))
+                        print("#" * 80 + "\n")
+                        sys.stdout.flush()
+                        
+                        if state["valid_count"] >= TARGET_SAMPLES:
+                            trial.study.stop()
                 else:
                     with print_lock:
                         print("[{}] [Trial {:04d} | PULO ANTI-DUP SOB LOCK] Isomorfo a {} -> Descartado".format(
@@ -781,7 +889,7 @@ def objective(trial):
     return f1, f2
 
 def main():
-    global GATE_NAME, TARGET_SAMPLES, OUTPUT_FILE, julia_semaphore, archive, anti_dup_enforcer
+    global GATE_NAME, TARGET_SAMPLES, OUTPUT_FILE, julia_semaphore, archive, anti_dup_enforcer, STRATIFIED_SPECTRUM, SNR_THRESHOLD
     import argparse
     parser = argparse.ArgumentParser(description="Gerador Optuna Multi-Objetivo DARTS XOR (MOTPE / NSGA-II)")
     parser.add_argument("--n_jobs", type=int, default=int(OPTUNA_CFG.get("num_workers", 6)), help="Número de workers paralelos no Optuna (padrão: 6)")
@@ -789,11 +897,22 @@ def main():
     parser.add_argument("--sampler", type=str, default="tpe", choices=["tpe", "nsgaii"], help="Algoritmo de amostragem: 'tpe' (Recomendado assíncrono) ou 'nsgaii'")
     parser.add_argument("--study_name", type=str, default="darts_xor_adaptive_v3", help="Nome do estudo no SQLite (padrão: darts_xor_adaptive_v3)")
     parser.add_argument("--pop_size", type=int, default=int(OPTUNA_CFG.get("population_size", 40)), help="Tamanho da população se usar NSGA-II (padrão: 40)")
-    parser.add_argument("--target_samples", type=int, default=None, help="Número de circuitos aceitos alvo (ex: 10)")
+    parser.add_argument("--target_samples", type=int, default=None, help="Número de circuitos aceitos alvo (ex: 10000)")
     parser.add_argument("--output_file", type=str, default=None, help="Caminho do arquivo JSONL de saída")
     parser.add_argument("--gate", type=str, default=GATE_NAME, choices=["XOR", "NOT", "AND", "OR", "NAND", "NOR"], help="Porta lógica alvo (padrão: XOR)")
     parser.add_argument("--max_concurrent_julia", type=int, default=None, help="Limite de simulações Julia simultâneas")
+    parser.add_argument("--stratified_spectrum", action="store_true", default=None, help="Ativa amostragem estratificada multi-faixas de SNR")
+    parser.add_argument("--no_stratified_spectrum", action="store_true", default=False, help="Desativa amostragem estratificada (usa modo clássico de limiar simples)")
+    parser.add_argument("--snr_threshold", type=float, default=None, help="Limiar mínimo de SNR no modo clássico (padrão: 0.85)")
     args = parser.parse_args()
+
+    if args.no_stratified_spectrum:
+        STRATIFIED_SPECTRUM = False
+    elif args.stratified_spectrum is not None:
+        STRATIFIED_SPECTRUM = args.stratified_spectrum
+
+    if args.snr_threshold is not None:
+        SNR_THRESHOLD = args.snr_threshold
 
     GATE_NAME = str(args.gate).upper()
     if args.study_name == "darts_xor_adaptive_v3" and GATE_NAME != "XOR":
@@ -808,6 +927,8 @@ def main():
         initial_count = 0
         archive = CircuitArchive(k_neighbors=10)
         anti_dup_enforcer = CircuitAntiDuplicationEnforcer(min_diversity_threshold=0.04)
+        for b_k in bin_counts:
+            bin_counts[b_k] = 0
         if os.path.exists(OUTPUT_FILE):
             with open(OUTPUT_FILE, "r") as f:
                 for line in f:
@@ -827,6 +948,9 @@ def main():
                             archive.add_circuit(len(c_slots), c_w, c_slots, c_snr, metadata={"id": c_obj.get("id")})
                             anti_dup_enforcer.register(len(c_slots), c_w, c_slots, circuit_id=str(c_obj.get("id", "")))
                             initial_count += 1
+                            b_k = get_spectrum_bin(c_snr)
+                            if b_k in bin_counts:
+                                bin_counts[b_k] += 1
                     except Exception:
                         pass
         state["valid_count"] = initial_count
@@ -840,6 +964,21 @@ def main():
     
     db_path = os.path.join(CURRENT_DIR, "optuna_multiobj_darts.db")
     storage_url = "sqlite:///" + db_path.replace("\\", "/")
+    
+    # Previne concorrência e deadlocks no SQLite ativando modo WAL (Write-Ahead Logging)
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=60000;")
+        conn.close()
+    except Exception:
+        pass
+
+    storage = optuna.storages.RDBStorage(
+        url=storage_url,
+        engine_kwargs={"connect_args": {"timeout": 60.0}}
+    )
     
     if args.sampler == "tpe":
         sampler = optuna.samplers.TPESampler(
@@ -861,7 +1000,7 @@ def main():
         study_name=args.study_name,
         directions=["maximize", "maximize"], # f1: SNR, f2: Novelty
         sampler=sampler,
-        storage=storage_url,
+        storage=storage,
         load_if_exists=True
     )
     
@@ -878,10 +1017,17 @@ def main():
         print("\n[{}] [PAUSA] Execução pausada pelo usuário. Todos os dados foram preservados!".format(ts()))
         
     print("\n" + "=" * 75)
-    print("  RELATÓRIO DO GERADOR OPTUNA MULTI-OBJETIVO")
+    print("  RELATÓRIO DO GERADOR OPTUNA MULTI-OBJETIVO (MULTI-ESPECTRO)")
     print("=" * 75)
     print("  Total de Circuitos Aceitos no Dataset: {}/{}".format(state["valid_count"], TARGET_SAMPLES))
     print("  Arquivo Gerado: {}".format(OUTPUT_FILE))
+    if STRATIFIED_SPECTRUM:
+        print("  Distribuição Final por Faixa de SNR:")
+        for b_k, b_info in SPECTRUM_BINS.items():
+            c_cur = bin_counts.get(b_k, 0)
+            c_tgt = b_info.get("target", 0)
+            pct = (float(c_cur) / max(1.0, float(c_tgt))) * 100.0
+            print("    - {:<38}: {:>5} / {:>5} ({:>5.1f}%)".format(b_info.get("name", b_k), c_cur, c_tgt, pct))
     print("  Total de Membros na Fronteira de Pareto: {}".format(len(study.best_trials)))
     print("=" * 75)
 

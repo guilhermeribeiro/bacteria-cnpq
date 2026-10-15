@@ -18,14 +18,31 @@ Os caminhos dos executáveis podem ser definidos manualmente em `config.json` ou
 
 ### 1. Geração de Datasets (`run_generator.py`)
 
-Executa a busca híbrida (DARTS via Theano + simulação estocástica em Julia) e salva os circuitos que atingem o limiar de SNR (padrão: $\ge 0.85$):
+Executa a busca híbrida (DARTS via Theano + simulação estocástica em Julia) e salva os circuitos no dataset JSONL.
+
+O gerador suporta **dois modos de amostragem**:
+
+#### A. Modo Multi-Espectro Estratificado (Recomendado para GNNs):
+Coleta amostras em todo o espectro biofísico de SNR (evitando truncamento de dados e colapso de contraste nas IAs):
+- **Falhas / Negativos / Ruído Alto ($SNR < 0.50$):** Cota de 1.500 amostras (ensina *anti-patterns* e falhas à IA).
+- **Sub-ótimos / Transição ($0.50 \le SNR < 0.85$):** Cota de 1.500 amostras (restaura o gradiente de transição).
+- **Funcionais Padrão ($0.85 \le SNR < 2.00$):** Cota de 4.500 amostras (amostras aprovadas com boa fidelidade).
+- **Alta Fidelidade / Campeões ($SNR \ge 2.00$):** Cota de 2.500 amostras (circuitos de alto contraste).
 
 ```bash
-# Porta XOR
-python run_generator.py --gate XOR --target_samples 2000 --n_jobs 8
+# Geração Multi-Espectro com cotas balanceadas (Meta total: 10.000 circuitos)
+python run_generator.py --gate XOR --target_samples 10000 --stratified_spectrum --n_jobs 8
+```
 
-# Porta NOT
-python run_generator.py --gate NOT --target_samples 12000 --n_jobs 8
+#### B. Modo Clássico (Limiar Fixo):
+Salva apenas os circuitos que atingem um limiar estrito:
+
+```bash
+# Salva apenas circuitos com SNR >= 0.85
+python run_generator.py --gate XOR --target_samples 2000 --no_stratified_spectrum --snr_threshold 0.85 --n_jobs 8
+
+# Porta NOT (Meta clássica: 12.000 circuitos)
+python run_generator.py --gate NOT --target_samples 12000 --no_stratified_spectrum --snr_threshold 0.85 --n_jobs 8
 ```
 
 O script salva o progresso de forma incremental em formato `.jsonl` e retoma automaticamente em caso de interrupção.

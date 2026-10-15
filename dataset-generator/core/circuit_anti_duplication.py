@@ -11,12 +11,14 @@ Combina:
 ==============================================================================
 """
 from __future__ import print_function, division
+import threading
 import numpy as np
 import networkx as nx
 
 class CircuitAntiDuplicationEnforcer(object):
     def __init__(self, min_diversity_threshold=0.04):
         self.min_diversity_threshold = float(min_diversity_threshold)
+        self.lock = threading.Lock()
         self.seen_wl_hashes = {}     # hash -> index
         self.active_graphs = []      # list of nx.DiGraph
         self.records = []            # list of metadata dicts
@@ -68,16 +70,17 @@ class CircuitAntiDuplicationEnforcer(object):
             # 1. Teste Canonico por Weisfeiler-Lehman Labeled Graph Hash
             wl_hash = nx.weisfeiler_lehman_graph_hash(subG, node_attr='label')
             
-            if wl_hash in self.seen_wl_hashes:
-                match_idx = self.seen_wl_hashes[wl_hash]
-                target_G = self.active_graphs[match_idx]
-                
-                # Verificacao estrita de seguranca contra colisoes de hash via VF2
-                em = nx.algorithms.isomorphism.categorical_node_match('label', '')
-                if nx.is_isomorphic(subG, target_G, node_match=em):
-                    target_id = self.records[match_idx].get('id', 'idx_{}'.format(match_idx))
-                    return True, "EXACT_FUNCTIONAL_ISOMORPHISM", target_id
+            with self.lock:
+                if wl_hash in self.seen_wl_hashes:
+                    match_idx = self.seen_wl_hashes[wl_hash]
+                    target_G = self.active_graphs[match_idx]
                     
+                    # Verificacao estrita de seguranca contra colisoes de hash via VF2
+                    em = nx.algorithms.isomorphism.categorical_node_match('label', '')
+                    if nx.is_isomorphic(subG, target_G, node_match=em):
+                        target_id = self.records[match_idx].get('id', 'idx_{}'.format(match_idx))
+                        return True, "EXACT_FUNCTIONAL_ISOMORPHISM", target_id
+                        
             return False, "UNIQUE", None
         except Exception as e:
             # Em caso de erro na analise de grafo, ser conservador (nao duplicado)
@@ -88,13 +91,15 @@ class CircuitAntiDuplicationEnforcer(object):
         try:
             subG, _ = self.extract_active_graph(S, matrix_W, slots)
             wl_hash = nx.weisfeiler_lehman_graph_hash(subG, node_attr='label')
-            idx = len(self.active_graphs)
-            self.seen_wl_hashes[wl_hash] = idx
-            self.active_graphs.append(subG)
-            self.records.append({'id': circuit_id, 'S': S, 'slots': slots, 'hash': wl_hash})
+            with self.lock:
+                idx = len(self.active_graphs)
+                self.seen_wl_hashes[wl_hash] = idx
+                self.active_graphs.append(subG)
+                self.records.append({'id': circuit_id, 'S': S, 'slots': slots, 'hash': wl_hash})
             return wl_hash
         except Exception:
             return ""
 
     def __len__(self):
-        return len(self.active_graphs)
+        with self.lock:
+            return len(self.active_graphs)

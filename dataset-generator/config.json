@@ -5,14 +5,14 @@
   },
   "dataset": {
     "gate_name": "XOR",
-    "snr_threshold": -999.0,
+    "snr_threshold": 0.85,
     "ensemble_size": 32,
     "output_file": "circuit_dataset_XOR.jsonl"
   },
   "generation": {
-    "target_samples": 10000,
+    "target_samples": 2000,
     "max_concurrent_julia": 4,
-    "stratified_spectrum": true,
+    "stratified_spectrum": false,
     "spectrum_bins": {
       "neg_and_low": {
         "name": "Falhas/Negativos/Muito Baixo (SNR < 0.50)",

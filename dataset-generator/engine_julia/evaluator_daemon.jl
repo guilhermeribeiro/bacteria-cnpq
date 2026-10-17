@@ -88,14 +88,14 @@ function get_components_from_json(json_path::String, N::Int)
 end
 
 function get_circuit_outputs(G::DiGraph, proteins)
-    model = Circuit(G, proteins; name=:evaluated_model)
-    problem = problem_from_model(model)
-    
+    local model, problem
     in_lac = nothing
     in_tet = nothing
     output = nothing
     idx = nothing
     try
+        model = Circuit(G, proteins; name=:evaluated_model)
+        problem = problem_from_model(model)
         in_lac = (@nonamespace model.LacI).λ
         in_tet = (@nonamespace model.TetR).λ
         output = (@nonamespace model.YFP).monomer
@@ -187,6 +187,10 @@ function evaluate_test_run(run_dir::String)
     
     s_00, s_01, s_10, s_11 = get_circuit_outputs(G, proteins)
     
+    if isempty(s_00) || isempty(s_01) || isempty(s_10) || isempty(s_11)
+        return 0.0, "Falha na resolucao de especies ou construcao do modelo"
+    end
+    
     m00, m01, m10, m11 = mean(s_00), mean(s_01), mean(s_10), mean(s_11)
     sd00, sd01, sd10, sd11 = std(s_00), std(s_01), std(s_10), std(s_11)
     se00, se01, se10, se11 = sd00/sqrt(ENSEMBLE_SIZE), sd01/sqrt(ENSEMBLE_SIZE), sd10/sqrt(ENSEMBLE_SIZE), sd11/sqrt(ENSEMBLE_SIZE)
@@ -218,21 +222,29 @@ function evaluate_test_run(run_dir::String)
     low_mean  = mean(s_low)
     signal = high_mean - low_mean
     noise_total = std(s_high) + std(s_low)
-    snr_std = noise_total > 1e-6 ? (signal / noise_total) : 0.0
-    snr_hiscock = mean(s_high .- s_low) / std(s_high .- s_low)
-    snr_final = max(snr_std, snr_hiscock)
+    snr_std = (noise_total > 1e-6 && !isnan(noise_total)) ? (signal / noise_total) : 0.0
+    
+    diff_sd = std(s_high .- s_low)
+    snr_hiscock = (diff_sd > 1e-6 && !isnan(diff_sd)) ? (mean(s_high .- s_low) / diff_sd) : 0.0
+    
+    snr_final = max(0.0, max(isnan(snr_std) ? 0.0 : snr_std, isnan(snr_hiscock) ? 0.0 : snr_hiscock))
+    if isnan(snr_final) || isinf(snr_final)
+        snr_final = 0.0
+    end
+    
+    clean_val(v) = (isnan(v) || isinf(v)) ? 0.0 : Float64(v)
     
     output_file = joinpath(run_dir, "snr_results.json")
     open(output_file, "w") do f
         JSON.print(f, Dict(
-            "snr" => snr_final,
-            "snr_xor" => snr_final,
-            "snr_standard" => snr_std,
-            "snr_hiscock" => snr_hiscock,
-            "mean_00" => m00, "se_00" => se00, "std_00" => sd00,
-            "mean_01" => m01, "se_01" => se01, "std_01" => sd01,
-            "mean_10" => m10, "se_10" => se10, "std_10" => sd10,
-            "mean_11" => m11, "se_11" => se11, "std_11" => sd11,
+            "snr" => clean_val(snr_final),
+            "snr_xor" => clean_val(snr_final),
+            "snr_standard" => clean_val(snr_std),
+            "snr_hiscock" => clean_val(snr_hiscock),
+            "mean_00" => clean_val(m00), "se_00" => clean_val(se00), "std_00" => clean_val(sd00),
+            "mean_01" => clean_val(m01), "se_01" => clean_val(se01), "std_01" => clean_val(sd01),
+            "mean_10" => clean_val(m10), "se_10" => clean_val(se10), "std_10" => clean_val(sd10),
+            "mean_11" => clean_val(m11), "se_11" => clean_val(se11), "std_11" => clean_val(sd11),
             "samples_00" => s_00,
             "samples_01" => s_01,
             "samples_10" => s_10,
@@ -240,7 +252,7 @@ function evaluate_test_run(run_dir::String)
         ), 4)
     end
     
-    return snr_final, ""
+    return clean_val(snr_final), ""
 end
 
 println(stdout, "JULIA_DAEMON_READY")

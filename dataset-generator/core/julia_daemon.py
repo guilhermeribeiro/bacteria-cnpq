@@ -18,6 +18,7 @@ Engenharia Defensiva de Produção:
 from __future__ import print_function, division
 import os
 import sys
+import math
 import json
 import time
 import threading
@@ -190,7 +191,12 @@ class JuliaDaemonClient(object):
                 resp = resp_line.strip()
                 if resp.startswith("SNR_RESULT:"):
                     parts = resp.split(":")
-                    snr_val = float(parts[1])
+                    try:
+                        snr_val = float(parts[1])
+                        if math.isnan(snr_val) or math.isinf(snr_val):
+                            snr_val = 0.0
+                    except (ValueError, IndexError):
+                        snr_val = 0.0
                     snr_file = os.path.join(run_dir, "snr_results.json")
                     snr_data = None
                     if os.path.exists(snr_file):

@@ -459,7 +459,7 @@ def get_julia_daemon():
                 daemon_script = os.path.join(CURRENT_DIR, "engine_julia", "evaluator_daemon.jl")
                 julia_daemon = JuliaDaemonClient(
                     JULIA_EXE, proj_dir, daemon_script,
-                    num_threads=6, ensemble_size=32, gate=GATE_NAME
+                    num_threads=6, ensemble_size=ENSEMBLE_SIZE, gate=GATE_NAME
                 )
             except Exception as e:
                 with print_lock:
@@ -473,6 +473,8 @@ def evaluate_with_julia(run_dir, timeout=45):
     if daemon:
         try:
             snr_val, snr_data, j_elapsed, err_msg = daemon.evaluate(run_dir, timeout=timeout)
+            if math.isnan(snr_val) or math.isinf(snr_val):
+                snr_val = 0.0
             if not err_msg and snr_data is not None:
                 return snr_val, snr_data, j_elapsed, ""
             return snr_val, snr_data, j_elapsed, err_msg
@@ -506,6 +508,8 @@ def evaluate_with_julia(run_dir, timeout=45):
             with open(snr_file, "r") as f:
                 data = json.load(f)
             snr_val = float(data.get("snr_xor", data.get("snr", 0.0)))
+            if math.isnan(snr_val) or math.isinf(snr_val):
+                snr_val = 0.0
             data["snr"] = snr_val
             return snr_val, data, j_elapsed, ""
         except Exception as e:
@@ -780,6 +784,8 @@ def objective(trial):
         sys.stdout.flush()
 
     snr_val, snr_data, j_elapsed, j_err = evaluate_with_julia(run_dir, timeout=60)
+    if math.isnan(snr_val) or math.isinf(snr_val):
+        snr_val = 0.0
     
     with print_lock:
         if j_err:

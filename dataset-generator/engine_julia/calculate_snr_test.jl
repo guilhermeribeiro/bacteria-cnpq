@@ -97,14 +97,14 @@ const ENSEMBLE_SIZE = 32
 const TARGET_GATE = "XOR"
 
 function get_circuit_outputs(G::DiGraph, proteins)
-    model = Circuit(G, proteins; name=:evaluated_model)
-    problem = problem_from_model(model)
-    
+    local model, problem
     in_lac = nothing
     in_tet = nothing
     output = nothing
     idx = nothing
     try
+        model = Circuit(G, proteins; name=:evaluated_model)
+        problem = problem_from_model(model)
         in_lac = (@nonamespace model.LacI).λ
         in_tet = (@nonamespace model.TetR).λ
         output = (@nonamespace model.YFP).monomer
@@ -252,31 +252,40 @@ function evaluate_test_run(run_dir::String)
     
     signal = high_mean - low_mean
     noise_total = std(s_high) + std(s_low)
-    snr_std = noise_total > 1e-6 ? (signal / noise_total) : 0.0
-    snr_hiscock = mean(s_high .- s_low) / std(s_high .- s_low)
-    snr_xor = max(snr_std, snr_hiscock)
+    snr_std = (noise_total > 1e-6 && !isnan(noise_total)) ? (signal / noise_total) : 0.0
+    
+    diff_sd = std(s_high .- s_low)
+    snr_hiscock = (diff_sd > 1e-6 && !isnan(diff_sd)) ? (mean(s_high .- s_low) / diff_sd) : 0.0
+    
+    snr_xor = max(0.0, max(isnan(snr_std) ? 0.0 : snr_std, isnan(snr_hiscock) ? 0.0 : snr_hiscock))
+    if isnan(snr_xor) || isinf(snr_xor)
+        snr_xor = 0.0
+    end
+    
+    clean_val(v) = (isnan(v) || isinf(v)) ? 0.0 : Float64(v)
     
     println("----------------------------------------")
     println("RESULTADOS DA SIMULAÇÃO (XOR):")
-    println("  State 00: $(round(m00, digits=4)) ± $(round(se00, digits=4)) (SD: $(round(sd00, digits=4)))")
-    println("  State 01: $(round(m01, digits=4)) ± $(round(se01, digits=4)) (SD: $(round(sd01, digits=4)))")
-    println("  State 10: $(round(m10, digits=4)) ± $(round(se10, digits=4)) (SD: $(round(sd10, digits=4)))")
-    println("  State 11: $(round(m11, digits=4)) ± $(round(se11, digits=4)) (SD: $(round(sd11, digits=4)))")
-    println("  SNR (Standard):      $(round(snr_std, digits=4))")
-    println("  SNR (Hiscock ALIFE): $(round(snr_hiscock, digits=4))")
-    println("  SNR Final (XOR):     $(round(snr_xor, digits=4))")
+    println("  State 00: $(round(clean_val(m00), digits=4)) ± $(round(clean_val(se00), digits=4)) (SD: $(round(clean_val(sd00), digits=4)))")
+    println("  State 01: $(round(clean_val(m01), digits=4)) ± $(round(clean_val(se01), digits=4)) (SD: $(round(clean_val(sd01), digits=4)))")
+    println("  State 10: $(round(clean_val(m10), digits=4)) ± $(round(clean_val(se10), digits=4)) (SD: $(round(clean_val(sd10), digits=4)))")
+    println("  State 11: $(round(clean_val(m11), digits=4)) ± $(round(clean_val(se11), digits=4)) (SD: $(round(clean_val(sd11), digits=4)))")
+    println("  SNR (Standard):      $(round(clean_val(snr_std), digits=4))")
+    println("  SNR (Hiscock ALIFE): $(round(clean_val(snr_hiscock), digits=4))")
+    println("  SNR Final (XOR):     $(round(clean_val(snr_xor), digits=4))")
     println("----------------------------------------")
     
     output_file = joinpath(run_dir, "snr_results.json")
     open(output_file, "w") do f
         JSON.print(f, Dict(
-            "snr_xor" => snr_xor,
-            "snr_standard" => snr_std,
-            "snr_hiscock" => snr_hiscock,
-            "mean_00" => m00, "se_00" => se00, "std_00" => sd00,
-            "mean_01" => m01, "se_01" => se01, "std_01" => sd01,
-            "mean_10" => m10, "se_10" => se10, "std_10" => sd10,
-            "mean_11" => m11, "se_11" => se11, "std_11" => sd11,
+            "snr" => clean_val(snr_xor),
+            "snr_xor" => clean_val(snr_xor),
+            "snr_standard" => clean_val(snr_std),
+            "snr_hiscock" => clean_val(snr_hiscock),
+            "mean_00" => clean_val(m00), "se_00" => clean_val(se00), "std_00" => clean_val(sd00),
+            "mean_01" => clean_val(m01), "se_01" => clean_val(se01), "std_01" => clean_val(sd01),
+            "mean_10" => clean_val(m10), "se_10" => clean_val(se10), "std_10" => clean_val(sd10),
+            "mean_11" => clean_val(m11), "se_11" => clean_val(se11), "std_11" => clean_val(sd11),
             "samples_00" => s_00,
             "samples_01" => s_01,
             "samples_10" => s_10,
@@ -285,7 +294,7 @@ function evaluate_test_run(run_dir::String)
     end
     println("✅ Resultados salvos em: ", output_file)
     
-    return snr_xor
+    return clean_val(snr_xor)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

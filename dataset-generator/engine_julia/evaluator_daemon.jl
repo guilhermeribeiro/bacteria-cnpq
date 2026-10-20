@@ -101,11 +101,11 @@ function get_circuit_outputs(G::DiGraph, proteins)
         output = (@nonamespace model.YFP).monomer
         idx = findfirst(isequal(output), states(problem.prob.f.sys))
     catch e
-        return Float64[], Float64[], Float64[], Float64[]
+        return Float64[], Float64[], Float64[], Float64[], "Erro na criacao do modelo Circuit: " * string(e)
     end
     
     if isnothing(idx)
-        return Float64[], Float64[], Float64[], Float64[]
+        return Float64[], Float64[], Float64[], Float64[], "Especie YFP nao encontrada nos estados do problema"
     end
     
     low_level  = 1 * log(2) / 90
@@ -149,7 +149,7 @@ function get_circuit_outputs(G::DiGraph, proteins)
         end
     end
     
-    return s_00, s_01, s_10, s_11
+    return s_00, s_01, s_10, s_11, ""
 end
 
 function evaluate_test_run(run_dir::String)
@@ -185,10 +185,10 @@ function evaluate_test_run(run_dir::String)
         return 0.0, "Circuito podado (0 conexoes)"
     end
     
-    s_00, s_01, s_10, s_11 = get_circuit_outputs(G, proteins)
+    s_00, s_01, s_10, s_11, err_out = get_circuit_outputs(G, proteins)
     
-    if isempty(s_00) || isempty(s_01) || isempty(s_10) || isempty(s_11)
-        return 0.0, "Falha na resolucao de especies ou construcao do modelo"
+    if !isempty(err_out) || isempty(s_00) || isempty(s_01) || isempty(s_10) || isempty(s_11)
+        return 0.0, isempty(err_out) ? "Falha na resolucao de especies ou construcao do modelo" : err_out
     end
     
     m00, m01, m10, m11 = mean(s_00), mean(s_01), mean(s_10), mean(s_11)

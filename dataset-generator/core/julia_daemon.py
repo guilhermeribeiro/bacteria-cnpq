@@ -197,6 +197,9 @@ class JuliaDaemonClient(object):
                             snr_val = 0.0
                     except (ValueError, IndexError):
                         snr_val = 0.0
+                    err_msg = ""
+                    if ":MSG:" in resp:
+                        err_msg = resp.split(":MSG:", 1)[1].strip()
                     snr_file = os.path.join(run_dir, "snr_results.json")
                     snr_data = None
                     if os.path.exists(snr_file):
@@ -206,7 +209,7 @@ class JuliaDaemonClient(object):
                             snr_data["snr"] = snr_val
                         except Exception:
                             pass
-                    return snr_val, snr_data, elapsed, ""
+                    return snr_val, snr_data, elapsed, err_msg
                 elif resp.startswith("ERROR:"):
                     return 0.0, None, elapsed, resp
                 else:

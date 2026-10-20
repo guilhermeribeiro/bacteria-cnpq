@@ -304,34 +304,6 @@ if os.path.exists(OUTPUT_FILE):
             except Exception:
                 pass
 
-# Se o arquivo de saida for novo e nao tiver sementes, herda sementes campeas de datasets de referencia
-if len(CHAMPION_SEEDS) == 0:
-    ref_files = [
-        os.path.join(CURRENT_DIR, "circuit_dataset_XOR.jsonl"),
-        os.path.join(CURRENT_DIR, "..", "dataset-SNR", "xor-dataset", "circuit_dataset_XOR.jsonl"),
-        os.path.join(CURRENT_DIR, "..", "dataset-SNR", "{}-dataset".format(GATE_NAME.lower()), "circuit_dataset_{}.jsonl".format(GATE_NAME)),
-    ]
-    for r_f in ref_files:
-        r_f_abs = os.path.abspath(r_f)
-        if os.path.exists(r_f_abs):
-            try:
-                with open(r_f_abs, "r") as f:
-                    for line in f:
-                        line_s = line.strip()
-                        if not line_s:
-                            continue
-                        try:
-                            c_obj = json.loads(line_s)
-                            s_val = c_obj.get("seed")
-                            if s_val is not None and isinstance(s_val, int) and s_val not in CHAMPION_SEEDS:
-                                CHAMPION_SEEDS.append(s_val)
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-            if len(CHAMPION_SEEDS) > 0:
-                break
-
 print("=" * 75)
 print("  GENENET-DARTS MULTI-OBJETIVO (NSGA-II) [DIVERSIDADE + MULTI-ESPECTRO]")
 print("=" * 75)

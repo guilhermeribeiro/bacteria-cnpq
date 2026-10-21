@@ -17,28 +17,30 @@
       "neg_and_low": {
         "name": "Falhas/Negativos/Muito Baixo (SNR < 0.50)",
         "min": -999.0,
-        "max": 0.50,
+        "max": 0.5,
         "target": 1500
       },
       "suboptimal": {
         "name": "Sub-ótimos/Transição (0.50 <= SNR < 0.85)",
-        "min": 0.50,
+        "min": 0.5,
         "max": 0.85,
         "target": 1500
       },
       "standard": {
         "name": "Funcionais Padrão (0.85 <= SNR < 2.00)",
         "min": 0.85,
-        "max": 2.00,
+        "max": 2.0,
         "target": 4500
       },
       "high_fidelity": {
         "name": "Alta Fidelidade / Campeões (SNR >= 2.00)",
-        "min": 2.00,
+        "min": 2.0,
         "max": 999.0,
         "target": 2500
       }
-    }
+    },
+    "julia_threads": "auto",
+    "julia_timeout": "auto"
   },
   "optuna": {
     "study_name": "darts_circuit_search_spectrum",

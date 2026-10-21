@@ -154,7 +154,7 @@ class JuliaDaemonClient(object):
                 pass
             self.stderr_file = None
 
-    def evaluate(self, run_dir, timeout=60):
+    def evaluate(self, run_dir, timeout=300):
         """
         Envia uma pasta de circuito para avaliacao no daemon com timeout estrito.
         Retorna: (snr_val: float, snr_data: dict, elapsed: float, err_msg: str)

@@ -55,7 +55,7 @@ def detect_julia():
     w_jl = shutil.which("julia") if hasattr(shutil, "which") else None
     return w_jl if w_jl else "julia"
 
-def evaluate_circuit(matrix_W, slots, gate="XOR", ensemble_size=32, julia_exe=None, timeout=120):
+def evaluate_circuit(matrix_W, slots, gate="XOR", ensemble_size=32, julia_exe=None, timeout=None):
     """
     Avalia um circuito genético candidato contra o simulador estocástico de Gillespie em Julia.
     
@@ -66,12 +66,14 @@ def evaluate_circuit(matrix_W, slots, gate="XOR", ensemble_size=32, julia_exe=No
       - gate: Porta lógica alvo ('XOR', 'NOT', 'AND', etc.). Padrão: 'XOR'.
       - ensemble_size: Número de trajetórias estocásticas independentes por condição (Padrão: 32).
       - julia_exe: Caminho para o executável do Julia (opcional, detecta automaticamente).
-      - timeout: Tempo máximo em segundos para a simulação (Padrão: 120s).
+      - timeout: Tempo máximo em segundos para a simulação (Padrão: dinâmico baseado no ensemble).
       
     Retorna:
       - snr: Float com o Signal-to-Noise Ratio pareado de Hiscock.
       - results: Dicionário completo contendo médias, desvios e amostras brutas de cada estado.
     """
+    if timeout is None:
+        timeout = max(180, int(ensemble_size * 2.5))
     W = np.asarray(matrix_W, dtype=np.float64)
     N = W.shape[0]
     if W.shape[0] != W.shape[1]:

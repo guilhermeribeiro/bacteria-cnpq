@@ -119,6 +119,29 @@ TARGET_SAMPLES = int(GEN_CFG.get("target_samples", 10000))
 OUTPUT_FILE    = os.path.join(CURRENT_DIR, DS_CFG.get("output_file", "circuit_dataset_XOR.jsonl"))
 STRATIFIED_SPECTRUM = bool(GEN_CFG.get("stratified_spectrum", True))
 
+# Configuração Dinâmica de Threads e Timeout do Julia SSA
+configured_threads = GEN_CFG.get("julia_threads", "auto")
+if configured_threads == "auto":
+    try:
+        cpu_cnt = multiprocessing.cpu_count()
+        JULIA_THREADS = max(4, cpu_cnt - 2) if cpu_cnt > 4 else cpu_cnt
+    except Exception:
+        JULIA_THREADS = 6
+else:
+    try:
+        JULIA_THREADS = int(configured_threads)
+    except Exception:
+        JULIA_THREADS = 6
+
+configured_timeout = GEN_CFG.get("julia_timeout", "auto")
+if configured_timeout == "auto":
+    JULIA_TIMEOUT = max(180, int(ENSEMBLE_SIZE * 2.5))
+else:
+    try:
+        JULIA_TIMEOUT = int(configured_timeout)
+    except Exception:
+        JULIA_TIMEOUT = max(180, int(ENSEMBLE_SIZE * 2.5))
+
 DEFAULT_SPECTRUM_BINS = {
     "neg_and_low": {
         "name": "Falhas/Negativos/Muito Baixo (SNR < 0.50)",
@@ -459,7 +482,7 @@ def get_julia_daemon():
                 daemon_script = os.path.join(CURRENT_DIR, "engine_julia", "evaluator_daemon.jl")
                 julia_daemon = JuliaDaemonClient(
                     JULIA_EXE, proj_dir, daemon_script,
-                    num_threads=6, ensemble_size=ENSEMBLE_SIZE, gate=GATE_NAME
+                    num_threads=JULIA_THREADS, ensemble_size=ENSEMBLE_SIZE, gate=GATE_NAME
                 )
             except Exception as e:
                 with print_lock:
@@ -468,7 +491,9 @@ def get_julia_daemon():
                 julia_daemon = False
         return julia_daemon
 
-def evaluate_with_julia(run_dir, timeout=45):
+def evaluate_with_julia(run_dir, timeout=None):
+    if timeout is None:
+        timeout = JULIA_TIMEOUT
     daemon = get_julia_daemon()
     if daemon:
         try:
@@ -481,7 +506,7 @@ def evaluate_with_julia(run_dir, timeout=45):
         except Exception as e:
             return 0.0, None, 0.0, "Falha na comunicação com daemon: " + str(e)
 
-    cmd = [JULIA_EXE, "-t", "4", "--startup-file=no", "-O1", JULIA_EVAL_SCRIPT, run_dir]
+    cmd = [JULIA_EXE, "-t", str(JULIA_THREADS), "--startup-file=no", "-O1", JULIA_EVAL_SCRIPT, run_dir]
     env = os.environ.copy()
     env["GKSwstype"] = "100"
     t0 = time.time()
@@ -783,7 +808,7 @@ def objective(trial):
         ))
         sys.stdout.flush()
 
-    snr_val, snr_data, j_elapsed, j_err = evaluate_with_julia(run_dir, timeout=60)
+    snr_val, snr_data, j_elapsed, j_err = evaluate_with_julia(run_dir, timeout=JULIA_TIMEOUT)
     if math.isnan(snr_val) or math.isinf(snr_val):
         snr_val = 0.0
     
@@ -895,7 +920,7 @@ def objective(trial):
     return f1, f2
 
 def main():
-    global GATE_NAME, TARGET_SAMPLES, OUTPUT_FILE, julia_semaphore, archive, anti_dup_enforcer, STRATIFIED_SPECTRUM, SNR_THRESHOLD
+    global GATE_NAME, TARGET_SAMPLES, OUTPUT_FILE, julia_semaphore, archive, anti_dup_enforcer, STRATIFIED_SPECTRUM, SNR_THRESHOLD, ENSEMBLE_SIZE, JULIA_TIMEOUT, JULIA_THREADS
     import argparse
     parser = argparse.ArgumentParser(description="Gerador Optuna Multi-Objetivo DARTS XOR (MOTPE / NSGA-II)")
     parser.add_argument("--n_jobs", type=int, default=int(OPTUNA_CFG.get("num_workers", 6)), help="Número de workers paralelos no Optuna (padrão: 6)")
@@ -906,11 +931,24 @@ def main():
     parser.add_argument("--target_samples", type=int, default=None, help="Número de circuitos aceitos alvo (ex: 10000)")
     parser.add_argument("--output_file", type=str, default=None, help="Caminho do arquivo JSONL de saída")
     parser.add_argument("--gate", type=str, default=GATE_NAME, choices=["XOR", "NOT", "AND", "OR", "NAND", "NOR"], help="Porta lógica alvo (padrão: XOR)")
+    parser.add_argument("--ensemble_size", type=int, default=None, help="Tamanho do ensemble estocástico SSA (padrão: 32)")
+    parser.add_argument("--julia_timeout", type=int, default=None, help="Timeout em segundos do Julia SSA (padrão: dinâmico baseado no ensemble)")
+    parser.add_argument("--julia_threads", type=int, default=None, help="Número de threads para o Julia SSA (padrão: auto)")
     parser.add_argument("--max_concurrent_julia", type=int, default=None, help="Limite de simulações Julia simultâneas")
     parser.add_argument("--stratified_spectrum", action="store_true", default=None, help="Ativa amostragem estratificada multi-faixas de SNR")
     parser.add_argument("--no_stratified_spectrum", action="store_true", default=False, help="Desativa amostragem estratificada (usa modo clássico de limiar simples)")
     parser.add_argument("--snr_threshold", type=float, default=None, help="Limiar mínimo de SNR no modo clássico (padrão: 0.85)")
     args = parser.parse_args()
+
+    if args.ensemble_size is not None:
+        ENSEMBLE_SIZE = args.ensemble_size
+        JULIA_TIMEOUT = max(180, int(ENSEMBLE_SIZE * 2.5))
+
+    if args.julia_timeout is not None:
+        JULIA_TIMEOUT = args.julia_timeout
+
+    if args.julia_threads is not None:
+        JULIA_THREADS = args.julia_threads
 
     if args.no_stratified_spectrum:
         STRATIFIED_SPECTRUM = False
@@ -1013,7 +1051,8 @@ def main():
     print("[{}] [INICIO] Estudo Optuna Multi-Objetivo carregado com sucesso.".format(ts()))
     print("[{}] Banco de Dados: {}".format(ts(), db_path))
     print("[{}] Estudo: '{}' | Sampler: {}".format(ts(), args.study_name, sampler_name))
-    print("[{}] Configuração: {} workers paralelos".format(ts(), args.n_jobs))
+    print("[{}] Configuração: {} workers paralelos | Julia SSA: {} threads".format(ts(), args.n_jobs, JULIA_THREADS))
+    print("[{}] Ensemble SSA: {} amostras | Watchdog Timeout: {}s".format(ts(), ENSEMBLE_SIZE, JULIA_TIMEOUT))
     print("[{}] Pressione Ctrl+C a qualquer momento para pausar sem perder nenhum circuito ou progresso.\n".format(ts()))
     sys.stdout.flush()
     

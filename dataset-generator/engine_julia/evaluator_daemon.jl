@@ -122,34 +122,44 @@ function get_circuit_outputs(G::DiGraph, proteins)
     s_10 = zeros(Float64, ENSEMBLE_SIZE)
     s_11 = zeros(Float64, ENSEMBLE_SIZE)
     
+    sim_error = Ref{String}("")
+    
     Threads.@threads for k in 1:ENSEMBLE_SIZE
         try
             sol00 = solve(prob_00, SSAStepper(); maxiters=250_000)
             s_00[k] = length(sol00) > 0 ? Float64(sol00[end][idx]) : 0.0
         catch e00
             s_00[k] = 0.0
+            sim_error[] = "solve(prob_00): " * sprint(showerror, e00)
         end
         try
             sol01 = solve(prob_01, SSAStepper(); maxiters=250_000)
             s_01[k] = length(sol01) > 0 ? Float64(sol01[end][idx]) : 0.0
         catch e01
             s_01[k] = 0.0
+            sim_error[] = "solve(prob_01): " * sprint(showerror, e01)
         end
         try
             sol10 = solve(prob_10, SSAStepper(); maxiters=250_000)
             s_10[k] = length(sol10) > 0 ? Float64(sol10[end][idx]) : 0.0
         catch e10
             s_10[k] = 0.0
+            sim_error[] = "solve(prob_10): " * sprint(showerror, e10)
         end
         try
             sol11 = solve(prob_11, SSAStepper(); maxiters=250_000)
             s_11[k] = length(sol11) > 0 ? Float64(sol11[end][idx]) : 0.0
         catch e11
             s_11[k] = 0.0
+            sim_error[] = "solve(prob_11): " * sprint(showerror, e11)
         end
     end
     
-    return s_00, s_01, s_10, s_11, ""
+    if !isempty(sim_error[]) && all(s_00 .== 0.0) && all(s_01 .== 0.0) && all(s_10 .== 0.0) && all(s_11 .== 0.0)
+        return Float64[], Float64[], Float64[], Float64[], sim_error[]
+    end
+    
+    return s_00, s_01, s_10, s_11, sim_error[]
 end
 
 function evaluate_test_run(run_dir::String)

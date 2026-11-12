@@ -20,7 +20,7 @@ dataset = pd.read_csv("/Users/guilhermeribeiro/MEGA/PyCharmProjects/bacteria-cnp
 dataset = dataset.replace(np.nan, 0)
 
 # Remoção de outliers (SNRs >= 5)
-dataset = dataset[dataset['Y']<5] # Remoção de outliers (SNRs >= 5)
+# dataset = dataset[dataset['Y']<5] # Remoção de outliers (SNRs >= 5)
 
 labels = dataset[['Y']]
 dataset = dataset.drop(['snr','Y', 'gate'], axis=1) # Porta NOT

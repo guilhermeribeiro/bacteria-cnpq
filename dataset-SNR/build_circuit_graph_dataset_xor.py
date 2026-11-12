@@ -432,8 +432,8 @@ def build_artifacts(input_path: Path, output_dir: Path, limit: int | None = None
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path, default=Path("xor-dataset/circuit_dataset_XOR.jsonl"))
-    parser.add_argument("--output-dir", type=Path, default=Path("xor-dataset/artifacts"))
+    parser.add_argument("--input", type=Path, default=Path("xor-dataset/circuit_dataset_XOR_256.jsonl"))
+    parser.add_argument("--output-dir", type=Path, default=Path("xor-dataset/artifacts_256"))
     parser.add_argument("--limit", type=int, default=None)
     return parser.parse_args()
 

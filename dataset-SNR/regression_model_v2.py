@@ -55,8 +55,8 @@ from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 warnings.filterwarnings("ignore")
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_DATASET = BASE_DIR / "xor-dataset" / "artifacts_256" / "graph_statistics.csv"
-DEFAULT_OUTPUT_DIR = BASE_DIR / "regression_results_v2_xor"
+DEFAULT_DATASET = BASE_DIR / "xor-dataset" / "artifacts_256_merged" / "graph_statistics.csv"
+DEFAULT_OUTPUT_DIR = BASE_DIR / "regression_results_v2_xor_merged"
 N_EXECUTIONS = 30
 TEST_SIZE = 0.33
 INCLUDE_SLOW_MODELS = False
@@ -340,8 +340,8 @@ def build_scenarios(features, labels):
     return OrderedDict(
         [
             ("dataset_completo", (features, labels)),
-            ("snr_menor_5", (features.loc[labels < 5], labels.loc[labels < 5])),
-            ("snr_maior_igual_5", (features.loc[labels >= 5], labels.loc[labels >= 5])),
+            # ("snr_menor_5", (features.loc[labels < 5], labels.loc[labels < 5])),
+            # ("snr_maior_igual_5", (features.loc[labels >= 5], labels.loc[labels >= 5])),
         ]
     )
 

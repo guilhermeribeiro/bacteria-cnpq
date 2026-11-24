@@ -198,6 +198,7 @@ def detect_python2():
         return sys.executable
         
     candidates = [
+        r"C:\Users\guilh\anaconda3\envs\python27-circuitos\python.exe",
         r"C:\Python27\python.exe",
         r"C:\Python27_x64\python.exe",
         which("python2"),

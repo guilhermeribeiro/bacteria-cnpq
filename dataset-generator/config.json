@@ -6,8 +6,8 @@
   "dataset": {
     "gate_name": "XOR",
     "snr_threshold": 0.85,
-    "ensemble_size": 32,
-    "output_file": "circuit_dataset_XOR.jsonl"
+    "ensemble_size": 256,
+    "output_file": "circuit_dataset_XOR_256.jsonl"
   },
   "generation": {
     "target_samples": 2000,

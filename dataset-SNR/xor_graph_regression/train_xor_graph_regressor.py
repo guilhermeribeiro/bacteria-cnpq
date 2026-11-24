@@ -535,14 +535,12 @@ def parse_args() -> argparse.Namespace:
     )
     # parser.add_argument("--input", type=Path, default='/Users/guilhermeribeiro/MEGA/PyCharmProjects/bacteria-cnpq/dataset-SNR/xor-dataset/circuit_dataset_XOR.jsonl')
     parser.add_argument("--input", type=Path,
-                        default=r'D:\Mega\PyCharmProjects\bacteria-cnpq\dataset-SNR\xor-dataset\circuit_dataset_XOR'
-                                r'.jsonl')
+                        default=r'C:\Users\guilh\PycharmProjects\bacteria-cnpq\dataset-SNR\xor-dataset\circuit_dataset_XOR.jsonl')
     # parser.add_argument("--output-dir", type=Path,
     #                     default='/Users/guilhermeribeiro/MEGA/PyCharmProjects/bacteria-cnpq/dataset-SNR/xor_graph_regression'
     #                             '/output_global_add_pool')
     parser.add_argument("--output-dir", type=Path,
-                        default=r'D:\Mega\PyCharmProjects\bacteria-cnpq\dataset-SNR\xor_graph_regression'
-                                r'\output_global_add_pool')
+                        default=r'C:\Users\guilh\PycharmProjects\bacteria-cnpq\dataset-SNR\xor_graph_regression\output_global_add_pool_seed_ajusted')
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=150)
     parser.add_argument("--batch-size", type=int, default=64)
@@ -567,26 +565,28 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--patience", type=int, default=25)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", default="cpu", help="auto, cpu, cuda ou mps")
+    parser.add_argument("--device", default="cuda", help="auto, cpu, cuda ou mps")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
+
 
     if not args.input.is_file():
         raise FileNotFoundError(f"JSONL nao encontrado: {args.input}")
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     for i in range(30):
+        random.seed(i)
+        torch.manual_seed(i)
+
         dataset = load_graph_dataset(args.input, args.limit)
         train_data, val_data, test_data = split_dataset(
             dataset,
             args.train_ratio,
             args.val_ratio,
-            args.seed,
+            i, #args.seed,
             args.stratify_bins,
             args.outlier_threshold,
         )
